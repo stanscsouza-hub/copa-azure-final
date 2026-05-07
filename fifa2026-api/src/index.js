@@ -3,6 +3,7 @@ const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
+const rateLimit = require('express-rate-limit');
 
 // Rotas
 const authRoutes = require('./routes/auth');
@@ -14,6 +15,15 @@ const usersRoutes = require('./routes/users');
 const adminRoutes = require('./routes/admin');
 
 const app = express();
+
+// Information disclosure: remover header X-Powered-By
+app.disable('x-powered-by');
+
+// Confiar no proxy (iisnode/Azure App Service) para enxergar o IP real do
+// cliente em X-Forwarded-For — necessário para rate limiting funcionar
+// corretamente atrás do iisnode.
+app.set('trust proxy', 1);
+
 const PORT = process.env.PORT || 3001;
 
 // Em VM/Web App: escuta em todas as interfaces. Em iisnode o PORT
@@ -44,6 +54,31 @@ app.use(cors({
   credentials: true
 }));
 app.use(express.json());
+
+// Rate limiting (TD-6)
+// Aplica DEPOIS de helmet/cors/express.json para preservar preflight CORS,
+// mas ANTES das rotas para que o limiter governe o acesso.
+const generalLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutos
+  max: 100,
+  message: { error: 'Muitas requisições. Aguarde alguns minutos.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 5,
+  message: { error: 'Muitas tentativas. Aguarde alguns minutos.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+  // Só conta tentativas que falharam — usuário válido pode logar várias vezes
+  skipSuccessfulRequests: true,
+});
+
+// /api/auth/login tem limiter mais estrito; demais endpoints usam o geral
+app.use('/api/auth/login', loginLimiter);
+app.use('/api', generalLimiter);
 
 // Rotas da API
 app.use('/api/auth', authRoutes);

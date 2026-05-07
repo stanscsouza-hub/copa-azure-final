@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { toast } from 'sonner';
 import {
   Ticket,
   Users,
@@ -39,30 +40,47 @@ interface SaleRow {
 }
 
 const Dashboard: React.FC = () => {
-  const { data: statsData, isLoading: statsLoading } = useQuery({
+  const { data: statsData, isLoading: statsLoading, isError: statsError } = useQuery({
     queryKey: ['admin', 'stats'],
     queryFn: () => api.getAdminStats(),
   });
 
-  const { data: salesData, isLoading: salesLoading } = useQuery({
+  const { data: salesData, isLoading: salesLoading, isError: salesError } = useQuery({
     queryKey: ['admin', 'sales'],
     queryFn: () => api.getSales(),
   });
 
-  const { data: matchesData } = useQuery({
+  const { data: matchesData, isError: matchesError } = useQuery({
     queryKey: ['matches'],
     queryFn: () => api.getMatches(),
   });
 
-  const { data: stadiumsData } = useQuery({
+  const { data: stadiumsData, isError: stadiumsError } = useQuery({
     queryKey: ['stadiums'],
     queryFn: () => api.getStadiums(),
   });
 
-  const { data: teamsData } = useQuery({
+  const { data: teamsData, isError: teamsError } = useQuery({
     queryKey: ['teams'],
     queryFn: () => api.getTeams(),
   });
+
+  // Toast de erro por query (TD-3)
+  useEffect(() => {
+    if (statsError) toast.error('Não foi possível carregar as estatísticas. Tente recarregar.');
+  }, [statsError]);
+  useEffect(() => {
+    if (salesError) toast.error('Não foi possível carregar as vendas. Tente recarregar.');
+  }, [salesError]);
+  useEffect(() => {
+    if (matchesError) toast.error('Não foi possível carregar os jogos. Tente recarregar.');
+  }, [matchesError]);
+  useEffect(() => {
+    if (stadiumsError) toast.error('Não foi possível carregar os estádios. Tente recarregar.');
+  }, [stadiumsError]);
+  useEffect(() => {
+    if (teamsError) toast.error('Não foi possível carregar as seleções. Tente recarregar.');
+  }, [teamsError]);
 
   const stats = statsData?.data?.stats as AdminStats | undefined;
   const allSales = (salesData?.data?.sales || []) as SaleRow[];
